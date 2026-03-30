@@ -9,9 +9,9 @@
 | `check_domain` | 对单个域名进行 HTTP/DNS/SSL/端口全面检测 |
 | `check_domains_batch` | 批量检测多个域名的可用性 |
 | `dns_lookup` | 查询域名的 A/AAAA/CNAME/MX/TXT/NS 等 DNS 记录 |
-| `ssl_check` | 检查 SSL 证书有效性、颁发机构、过期时间 |
+| `ssl_check` | 检查 SSL 证书有效性、颁发机构、过期时间，支持指定 IP 绕过 DNS 探测源站 |
 | `ping_check` | Ping 主机检测网络连通性与延迟 |
-| `http_health_check` | 检查 HTTP 端点健康状态（支持状态码和内容匹配） |
+| `http_health_check` | 检查 HTTP 端点健康状态，支持指定 IP 绕过 DNS 探测源站 |
 | `whois_check` | 查询域名 WHOIS 注册信息 |
 
 ## 快速开始
@@ -32,24 +32,23 @@ cd ops-probe-mcp
 # 编译
 go build -o ops-probe-mcp
 
-# 运行（HTTP 模式，默认端口 8080）
-./ops-probe-mcp -port 8080
+# 运行（默认端口 8080）
+./ops-probe-mcp
 
-# 运行（stdio 模式，用于本地 MCP 客户端）
-./ops-probe-mcp -stdio
+# 指定端口
+./ops-probe-mcp -port 9090
 ```
 
-### 交叉编译（Linux）
+### 交叉编译
 
 ```bash
 chmod +x build.sh
 ./build.sh
-# 生成 ops-probe-mcp-linux-amd64
+# 生成 ./bin/ops-probe-mcp-darwin-arm64
+# 生成 ./bin/ops-probe-mcp-linux-amd64
 ```
 
 ## 集成到 Claude Code
-
-### 远程 HTTP 模式
 
 在 `.claude/settings.json` 或项目的 MCP 配置中添加：
 
@@ -59,20 +58,6 @@ chmod +x build.sh
     "ops-probe": {
       "type": "http",
       "url": "http://localhost:8080/mcp"
-    }
-  }
-}
-```
-
-### 本地 stdio 模式
-
-```json
-{
-  "mcpServers": {
-    "ops-probe": {
-      "type": "stdio",
-      "command": "/path/to/ops-probe-mcp",
-      "args": ["-stdio"]
     }
   }
 }
@@ -132,6 +117,18 @@ chmod +x build.sh
 }
 ```
 
+指定 IP 探测源站（绕过 CDN）：
+
+```json
+{
+  "name": "ssl_check",
+  "arguments": {
+    "domain": "example.com",
+    "resolve_ip": "1.2.3.4"
+  }
+}
+```
+
 ### ping_check — Ping 检测
 
 ```json
@@ -159,6 +156,18 @@ chmod +x build.sh
 }
 ```
 
+指定 IP 探测源站（绕过 CDN）：
+
+```json
+{
+  "name": "http_health_check",
+  "arguments": {
+    "url": "https://example.com/health",
+    "resolve_ip": "1.2.3.4"
+  }
+}
+```
+
 ### whois_check — WHOIS 查询
 
 ```json
@@ -174,7 +183,7 @@ chmod +x build.sh
 
 ```
 ops-probe-mcp/
-├── main.go              # 入口：注册工具、启动服务器（HTTP/stdio 双模式）
+├── main.go              # 入口：注册工具、启动 Streamable HTTP 服务器
 ├── tools/
 │   ├── tools.go         # MCP 工具定义（参数 Schema）
 │   └── handlers.go      # 工具请求路由处理
@@ -189,7 +198,8 @@ ops-probe-mcp/
 ├── handler/
 │   ├── domain_handler.go# 域名相关工具处理逻辑
 │   └── ops_handler.go   # 运维工具处理逻辑
-├── build.sh             # Linux 交叉编译脚本
+├── bin/                 # 编译输出目录
+├── build.sh             # 多平台编译脚本
 ├── go.mod
 └── go.sum
 ```
@@ -198,7 +208,7 @@ ops-probe-mcp/
 
 - **[mcp-go](https://github.com/mark3labs/mcp-go)** — MCP 协议 Go 实现
 - **[miekg/dns](https://github.com/miekg/dns)** — DNS 查询库
-- 支持 **Streamable HTTP** 和 **stdio** 两种传输模式
+- 传输模式：**Streamable HTTP**
 
 ## License
 
