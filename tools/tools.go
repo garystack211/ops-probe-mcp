@@ -54,7 +54,7 @@ func NewSSLCheckTool() mcp.Tool {
 			mcp.Required(),
 			mcp.Description("The domain name to check SSL certificate")),
 		mcp.WithString("resolve_ip",
-			mcp.Description("Force TCP connection to this IP address instead of resolving the hostname via DNS. The TLS SNI still uses the original domain. Useful for testing origin servers behind a CDN (e.g., '1.2.3.4').")),
+			mcp.Description("IP address only, no port (e.g. '1.2.3.4'). Forces TCP connection to this IP instead of DNS resolution; TLS SNI still uses the original domain. Useful for testing origin servers behind a CDN.")),
 	)
 }
 
@@ -84,7 +84,7 @@ func NewHealthCheckTool() mcp.Tool {
 		mcp.WithNumber("timeout",
 			mcp.Description("Timeout in seconds (default: 10)")),
 		mcp.WithString("resolve_ip",
-			mcp.Description("Force TCP connection to this IP address instead of resolving the hostname via DNS. The Host header and TLS SNI still use the original domain. Useful for testing origin servers behind a CDN (e.g., '1.2.3.4' or '1.2.3.4:8080').")),
+			mcp.Description("IP address only, no port (e.g. '1.2.3.4'). The port is extracted from the URL automatically (443 for https, 80 for http). For non-standard ports, put the port in the URL (e.g. url='https://example.com:8080'). Forces TCP connection to this IP instead of DNS resolution; Host header and TLS SNI still use the original domain.")),
 	)
 }
 
