@@ -2,6 +2,7 @@ package checker
 
 import (
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -123,6 +124,166 @@ func SSLCheck(targetURL string, timeout time.Duration, resolveIP ...string) (*SS
 	if err != nil {
 		result.Valid = false
 		result.Issues = append(result.Issues, "Certificate verification failed: "+err.Error())
+	}
+
+	return result, nil
+}
+
+// SSLCertDetail holds detailed certificate information.
+type SSLCertDetail struct {
+	// Leaf certificate
+	Subject            string   `json:"subject"`
+	CommonName         string   `json:"common_name"`
+	SANs               []string `json:"sans"`
+	Issuer             string   `json:"issuer"`
+	IssuerOrg          string   `json:"issuer_org,omitempty"`
+	SerialNumber       string   `json:"serial_number"`
+	SignatureAlgorithm string   `json:"signature_algorithm"`
+	PublicKeyAlgorithm string   `json:"public_key_algorithm"`
+	NotBefore          string   `json:"not_before"`
+	NotAfter           string   `json:"not_after"`
+	DaysRemaining      int      `json:"days_remaining"`
+	Fingerprint        string   `json:"fingerprint_sha256"`
+	Protocol           string   `json:"protocol"`
+	// Chain info
+	ChainValid bool              `json:"chain_valid"`
+	Chain      []SSLCertChainEntry `json:"chain"`
+	// Overall
+	Valid  bool     `json:"valid"`
+	Issues []string `json:"issues"`
+	Error  string   `json:"error,omitempty"`
+}
+
+type SSLCertChainEntry struct {
+	Subject   string `json:"subject"`
+	Issuer    string `json:"issuer"`
+	NotBefore string `json:"not_before"`
+	NotAfter  string `json:"not_after"`
+	IsCA      bool   `json:"is_ca"`
+}
+
+// SSLCertDetailCheck retrieves detailed SSL certificate information.
+func SSLCertDetailCheck(targetURL string, timeout time.Duration, resolveIP ...string) (*SSLCertDetail, error) {
+	result := &SSLCertDetail{
+		Valid:  false,
+		Issues: []string{},
+	}
+
+	if timeout == 0 {
+		timeout = 10 * time.Second
+	}
+
+	parsedURL, err := url.Parse(targetURL)
+	if err != nil {
+		result.Error = "Invalid URL: " + err.Error()
+		return result, nil
+	}
+
+	host := parsedURL.Hostname()
+	port := parsedURL.Port()
+	if port == "" {
+		port = "443"
+	}
+
+	tlsConfig := &tls.Config{
+		ServerName:         host,
+		InsecureSkipVerify: false,
+		MinVersion:         tls.VersionTLS10,
+	}
+
+	var conn *tls.Conn
+	if len(resolveIP) > 0 && resolveIP[0] != "" {
+		ip := resolveIP[0]
+		dialer := &net.Dialer{Timeout: timeout}
+		rawConn, dialErr := dialer.DialContext(context.Background(), "tcp", net.JoinHostPort(ip, port))
+		if dialErr != nil {
+			err = dialErr
+		} else {
+			conn = tls.Client(rawConn, tlsConfig)
+			if err2 := conn.Handshake(); err2 != nil {
+				rawConn.Close()
+				err = err2
+				conn = nil
+			}
+		}
+	} else {
+		conn, err = tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", host+":"+port, tlsConfig)
+	}
+
+	if err != nil {
+		result.Error = err.Error()
+		result.Issues = append(result.Issues, "TLS connection failed: "+err.Error())
+		return result, nil
+	}
+	defer conn.Close()
+
+	state := conn.ConnectionState()
+	if len(state.PeerCertificates) == 0 {
+		result.Error = "No certificates found"
+		return result, nil
+	}
+
+	cert := state.PeerCertificates[0]
+
+	// Leaf certificate details
+	result.Subject = cert.Subject.String()
+	result.CommonName = cert.Subject.CommonName
+	result.SANs = cert.DNSNames
+	result.Issuer = cert.Issuer.CommonName
+	if len(cert.Issuer.Organization) > 0 {
+		result.IssuerOrg = cert.Issuer.Organization[0]
+	}
+	result.SerialNumber = cert.SerialNumber.Text(16)
+	result.SignatureAlgorithm = cert.SignatureAlgorithm.String()
+	result.PublicKeyAlgorithm = cert.PublicKeyAlgorithm.String()
+	result.NotBefore = cert.NotBefore.UTC().Format(time.RFC3339)
+	result.NotAfter = cert.NotAfter.UTC().Format(time.RFC3339)
+	result.DaysRemaining = int(time.Until(cert.NotAfter).Hours() / 24)
+	result.Protocol = getSSLProtocolVersion(state.Version)
+
+	// SHA-256 fingerprint
+	fingerprint := sha256.Sum256(cert.Raw)
+	hexParts := make([]string, len(fingerprint))
+	for i, b := range fingerprint {
+		hexParts[i] = fmt.Sprintf("%02X", b)
+	}
+	result.Fingerprint = strings.Join(hexParts, ":")
+
+	// Certificate chain
+	for _, c := range state.PeerCertificates {
+		result.Chain = append(result.Chain, SSLCertChainEntry{
+			Subject:   c.Subject.CommonName,
+			Issuer:    c.Issuer.CommonName,
+			NotBefore: c.NotBefore.UTC().Format(time.RFC3339),
+			NotAfter:  c.NotAfter.UTC().Format(time.RFC3339),
+			IsCA:      c.IsCA,
+		})
+	}
+
+	// Verify chain
+	intermediates := x509.NewCertPool()
+	for _, ic := range state.PeerCertificates[1:] {
+		intermediates.AddCert(ic)
+	}
+	opts := x509.VerifyOptions{
+		DNSName:       host,
+		Intermediates: intermediates,
+	}
+	_, verifyErr := cert.Verify(opts)
+	result.ChainValid = verifyErr == nil
+	result.Valid = verifyErr == nil
+
+	if verifyErr != nil {
+		result.Issues = append(result.Issues, "Certificate verification failed: "+verifyErr.Error())
+	}
+	if cert.IsCA {
+		result.Issues = append(result.Issues, "Certificate is a CA certificate")
+	}
+	if result.DaysRemaining < 30 {
+		result.Issues = append(result.Issues, "Certificate expires within 30 days")
+	}
+	if time.Until(cert.NotBefore).Hours() > 0 {
+		result.Issues = append(result.Issues, "Certificate is not yet valid")
 	}
 
 	return result, nil

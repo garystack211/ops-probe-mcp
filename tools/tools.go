@@ -58,6 +58,17 @@ func NewSSLCheckTool() mcp.Tool {
 	)
 }
 
+func NewSSLCertDetailTool() mcp.Tool {
+	return mcp.NewTool("ssl_cert_detail",
+		mcp.WithDescription("Get detailed SSL certificate information including SANs, signature algorithm, fingerprint, and full certificate chain. Supports connecting to a specific IP to bypass DNS."),
+		mcp.WithString("domain",
+			mcp.Required(),
+			mcp.Description("The domain name to check SSL certificate")),
+		mcp.WithString("resolve_ip",
+			mcp.Description("IP address only, no port (e.g. '1.2.3.4'). Forces TCP connection to this IP instead of DNS resolution; TLS SNI still uses the original domain.")),
+	)
+}
+
 func NewPingCheckTool() mcp.Tool {
 	return mcp.NewTool("ping_check",
 		mcp.WithDescription("Ping a host to check network connectivity and latency"),

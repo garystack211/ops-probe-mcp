@@ -21,8 +21,9 @@ func main() {
 	s.AddTool(tools.NewCheckDomainsBatchTool(), tools.CheckDomainsBatchHandler)
 	s.AddTool(tools.NewDNSLookupTool(), tools.DNSLookupHandler)
 	s.AddTool(tools.NewSSLCheckTool(), tools.SSLCheckHandler)
+	s.AddTool(tools.NewSSLCertDetailTool(), tools.SSLCertDetailHandler)
 
-	// 注册新增的 3 个运维工具
+	// 注册新增的运维工具
 	s.AddTool(tools.NewPingCheckTool(), tools.PingCheckHandler)
 	s.AddTool(tools.NewHealthCheckTool(), tools.HealthCheckHandler)
 	s.AddTool(tools.NewWhoisCheckTool(), tools.WhoisCheckHandler)

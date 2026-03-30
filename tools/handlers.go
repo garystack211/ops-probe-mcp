@@ -124,6 +124,32 @@ func SSLCheckHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	return mcp.NewToolResultText(string(jsonData)), nil
 }
 
+func SSLCertDetailHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	start := time.Now()
+	args, _ := request.Params.Arguments.(map[string]interface{})
+	domain, _ := args["domain"].(string)
+	resolveIP, _ := args["resolve_ip"].(string)
+	resolveIP = stripPort(resolveIP)
+
+	if resolveIP != "" {
+		log.Printf("[SSL_CERT_DETAIL] Request - Domain: %s, ResolveIP: %s", domain, resolveIP)
+	} else {
+		log.Printf("[SSL_CERT_DETAIL] Request - Domain: %s", domain)
+	}
+
+	result, err := handler.SSLCertDetailCheck(domain, resolveIP)
+	duration := time.Since(start)
+
+	if err != nil {
+		log.Printf("[SSL_CERT_DETAIL] Error - Domain: %s, Duration: %v, Error: %v", domain, duration, err)
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	jsonData, _ := json.Marshal(result)
+	log.Printf("[SSL_CERT_DETAIL] Success - Domain: %s, Duration: %v, Valid: %v, Days: %d", domain, duration, result.Valid, result.DaysRemaining)
+	return mcp.NewToolResultText(string(jsonData)), nil
+}
+
 func PingCheckHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
 	args, _ := request.Params.Arguments.(map[string]interface{})
