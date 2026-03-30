@@ -4,11 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"net"
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"ops-probe-mcp/handler"
 )
+
+// stripPort removes a port suffix from an IP address if present.
+// e.g. "1.2.3.4:443" -> "1.2.3.4", "1.2.3.4" -> "1.2.3.4"
+func stripPort(ip string) string {
+	host, _, err := net.SplitHostPort(ip)
+	if err != nil {
+		return ip // no port present, return as-is
+	}
+	return host
+}
 
 func CheckDomainHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	start := time.Now()
@@ -92,6 +103,7 @@ func SSLCheckHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	args, _ := request.Params.Arguments.(map[string]interface{})
 	domain, _ := args["domain"].(string)
 	resolveIP, _ := args["resolve_ip"].(string)
+	resolveIP = stripPort(resolveIP)
 
 	if resolveIP != "" {
 		log.Printf("[SSL_CHECK] Request - Domain: %s, ResolveIP: %s", domain, resolveIP)
@@ -154,6 +166,7 @@ func HealthCheckHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 		timeout = time.Duration(t) * time.Second
 	}
 	resolveIP, _ := args["resolve_ip"].(string)
+	resolveIP = stripPort(resolveIP)
 
 	if resolveIP != "" {
 		log.Printf("[HEALTH_CHECK] Request - URL: %s, ResolveIP: %s", url, resolveIP)

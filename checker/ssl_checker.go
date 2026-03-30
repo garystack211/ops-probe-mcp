@@ -98,15 +98,6 @@ func SSLCheck(targetURL string, timeout time.Duration, resolveIP ...string) (*SS
 		result.Issues = append(result.Issues, "Certificate is a CA certificate")
 	}
 
-	if len(state.PeerCertificates) > 1 {
-		result.Issues = append(result.Issues, "Certificate chain has multiple certificates")
-	}
-
-	chainVerified := verifyCertificateChain(state.PeerCertificates)
-	if !chainVerified {
-		result.Issues = append(result.Issues, "Certificate chain verification failed")
-	}
-
 	result.Issuer = cert.Issuer.CommonName
 	result.Subject = cert.Subject.CommonName
 
@@ -118,29 +109,23 @@ func SSLCheck(targetURL string, timeout time.Duration, resolveIP ...string) (*SS
 		result.Issues = append(result.Issues, "Certificate is not yet valid")
 	}
 
+	// Build intermediate certificate pool from the chain returned by the server
+	intermediates := x509.NewCertPool()
+	for _, ic := range state.PeerCertificates[1:] {
+		intermediates.AddCert(ic)
+	}
+
 	opts := x509.VerifyOptions{
-		DNSName: host,
+		DNSName:       host,
+		Intermediates: intermediates,
 	}
 	_, err = cert.Verify(opts)
 	if err != nil {
-		result.Issues = append(result.Issues, "Certificate hostname verification failed")
+		result.Valid = false
+		result.Issues = append(result.Issues, "Certificate verification failed: "+err.Error())
 	}
 
 	return result, nil
-}
-
-func verifyCertificateChain(certs []*x509.Certificate) bool {
-	if len(certs) < 2 {
-		return true
-	}
-
-	for i := 0; i < len(certs)-1; i++ {
-		if certs[i].Subject.CommonName != certs[i+1].Issuer.CommonName {
-			return false
-		}
-	}
-
-	return true
 }
 
 func getSSLProtocolVersion(version uint16) string {
