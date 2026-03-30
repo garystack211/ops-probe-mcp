@@ -49,10 +49,12 @@ func NewDNSLookupTool() mcp.Tool {
 
 func NewSSLCheckTool() mcp.Tool {
 	return mcp.NewTool("ssl_check",
-		mcp.WithDescription("Check SSL certificate information for a domain"),
+		mcp.WithDescription("Check SSL certificate information for a domain. Supports connecting to a specific IP to bypass DNS (useful for testing origin servers behind CDN)."),
 		mcp.WithString("domain",
 			mcp.Required(),
 			mcp.Description("The domain name to check SSL certificate")),
+		mcp.WithString("resolve_ip",
+			mcp.Description("Force TCP connection to this IP address instead of resolving the hostname via DNS. The TLS SNI still uses the original domain. Useful for testing origin servers behind a CDN (e.g., '1.2.3.4').")),
 	)
 }
 

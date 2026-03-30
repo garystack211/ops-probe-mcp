@@ -1,9 +1,11 @@
 package checker
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"net"
 	"net/url"
 	"strings"
 	"time"
@@ -20,7 +22,7 @@ type SSLResult struct {
 	Error         string    `json:"error,omitempty"`
 }
 
-func SSLCheck(targetURL string, timeout time.Duration) (*SSLResult, error) {
+func SSLCheck(targetURL string, timeout time.Duration, resolveIP ...string) (*SSLResult, error) {
 	result := &SSLResult{
 		Valid:  false,
 		Issues: []string{},
@@ -42,11 +44,30 @@ func SSLCheck(targetURL string, timeout time.Duration) (*SSLResult, error) {
 		port = "443"
 	}
 
-	conn, err := tls.Dial("tcp", host+":"+port, &tls.Config{
+	tlsConfig := &tls.Config{
 		ServerName:         host,
 		InsecureSkipVerify: false,
 		MinVersion:         tls.VersionTLS10,
-	})
+	}
+
+	var conn *tls.Conn
+	if len(resolveIP) > 0 && resolveIP[0] != "" {
+		ip := resolveIP[0]
+		dialer := &net.Dialer{Timeout: timeout}
+		rawConn, dialErr := dialer.DialContext(context.Background(), "tcp", net.JoinHostPort(ip, port))
+		if dialErr != nil {
+			err = dialErr
+		} else {
+			conn = tls.Client(rawConn, tlsConfig)
+			if err2 := conn.Handshake(); err2 != nil {
+				rawConn.Close()
+				err = err2
+				conn = nil
+			}
+		}
+	} else {
+		conn, err = tls.DialWithDialer(&net.Dialer{Timeout: timeout}, "tcp", host+":"+port, tlsConfig)
+	}
 
 	if err != nil {
 		if strings.Contains(err.Error(), "certificate has expired") {
@@ -86,22 +107,8 @@ func SSLCheck(targetURL string, timeout time.Duration) (*SSLResult, error) {
 		result.Issues = append(result.Issues, "Certificate chain verification failed")
 	}
 
-	certIssuer := ""
-	for _, name := range cert.Issuer.Organization {
-		certIssuer = name
-		break
-	}
-	result.Issuer = certIssuer
-
-	certSubject := ""
-	for _, name := range cert.Subject.Organization {
-		certSubject = name
-		break
-	}
-	if certSubject == "" {
-		certSubject = cert.Subject.CommonName
-	}
-	result.Subject = certSubject
+	result.Issuer = cert.Issuer.CommonName
+	result.Subject = cert.Subject.CommonName
 
 	if time.Until(cert.NotAfter).Hours()/24 < 30 {
 		result.Issues = append(result.Issues, "Certificate expires within 30 days")

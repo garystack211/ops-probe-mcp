@@ -91,10 +91,15 @@ func SSLCheckHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.Cal
 	start := time.Now()
 	args, _ := request.Params.Arguments.(map[string]interface{})
 	domain, _ := args["domain"].(string)
+	resolveIP, _ := args["resolve_ip"].(string)
 
-	log.Printf("[SSL_CHECK] Request - Domain: %s", domain)
+	if resolveIP != "" {
+		log.Printf("[SSL_CHECK] Request - Domain: %s, ResolveIP: %s", domain, resolveIP)
+	} else {
+		log.Printf("[SSL_CHECK] Request - Domain: %s", domain)
+	}
 
-	result, err := handler.SSLCertificateCheck(domain)
+	result, err := handler.SSLCertificateCheck(domain, resolveIP)
 	duration := time.Since(start)
 
 	if err != nil {

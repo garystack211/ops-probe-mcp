@@ -125,7 +125,7 @@ func DNSLookup(domain string, recordType string) (*checker.DNSResult, error) {
 	return result, nil
 }
 
-func SSLCertificateCheck(domain string) (*checker.SSLResult, error) {
+func SSLCertificateCheck(domain string, resolveIP string) (*checker.SSLResult, error) {
 	sslURL := domain
 	if !strings.HasPrefix(sslURL, "https") {
 		if !strings.HasPrefix(sslURL, "http") {
@@ -135,7 +135,7 @@ func SSLCertificateCheck(domain string) (*checker.SSLResult, error) {
 		}
 	}
 
-	result, err := checker.SSLCheck(sslURL, 10*time.Second)
+	result, err := checker.SSLCheck(sslURL, 10*time.Second, resolveIP)
 	if err != nil {
 		return nil, err
 	}
