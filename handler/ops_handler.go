@@ -10,8 +10,8 @@ func PingCheck(host string, count int, timeout time.Duration) (*checker.PingResu
 	return checker.PingCheck(host, count, timeout)
 }
 
-func HTTPHealthCheck(url string, expectedStatus int, expectedContent string, timeout time.Duration) (*checker.HealthCheckResult, error) {
-	return checker.HTTPHealthCheck(url, expectedStatus, expectedContent, timeout)
+func HTTPHealthCheck(url string, expectedStatus int, expectedContent string, timeout time.Duration, resolveIP string) (*checker.HealthCheckResult, error) {
+	return checker.HTTPHealthCheck(url, expectedStatus, expectedContent, timeout, resolveIP)
 }
 
 func WhoisCheck(domain string, timeout time.Duration) (*checker.WhoisResult, error) {

@@ -148,10 +148,15 @@ func HealthCheckHandler(ctx context.Context, request mcp.CallToolRequest) (*mcp.
 	if t, ok := args["timeout"].(float64); ok {
 		timeout = time.Duration(t) * time.Second
 	}
+	resolveIP, _ := args["resolve_ip"].(string)
 
-	log.Printf("[HEALTH_CHECK] Request - URL: %s", url)
+	if resolveIP != "" {
+		log.Printf("[HEALTH_CHECK] Request - URL: %s, ResolveIP: %s", url, resolveIP)
+	} else {
+		log.Printf("[HEALTH_CHECK] Request - URL: %s", url)
+	}
 
-	result, err := handler.HTTPHealthCheck(url, expectedStatus, expectedContent, timeout)
+	result, err := handler.HTTPHealthCheck(url, expectedStatus, expectedContent, timeout, resolveIP)
 	duration := time.Since(start)
 
 	if err != nil {

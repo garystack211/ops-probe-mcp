@@ -71,7 +71,7 @@ func NewPingCheckTool() mcp.Tool {
 
 func NewHealthCheckTool() mcp.Tool {
 	return mcp.NewTool("http_health_check",
-		mcp.WithDescription("Check HTTP endpoint health status"),
+		mcp.WithDescription("Check HTTP endpoint health status. Supports connecting to a specific IP to bypass DNS (useful for testing origin servers behind CDN)."),
 		mcp.WithString("url",
 			mcp.Required(),
 			mcp.Description("The URL to check")),
@@ -81,6 +81,8 @@ func NewHealthCheckTool() mcp.Tool {
 			mcp.Description("Expected content in response body")),
 		mcp.WithNumber("timeout",
 			mcp.Description("Timeout in seconds (default: 10)")),
+		mcp.WithString("resolve_ip",
+			mcp.Description("Force TCP connection to this IP address instead of resolving the hostname via DNS. The Host header and TLS SNI still use the original domain. Useful for testing origin servers behind a CDN (e.g., '1.2.3.4' or '1.2.3.4:8080').")),
 	)
 }
 
